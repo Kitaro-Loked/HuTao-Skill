@@ -1,11 +1,11 @@
-"""Hu Tao Soul Awakening Skill for OpenClaw
+"""Hu Tao Netherworld Guide Skill for OpenClaw
 
-胡桃·阴阳两界灵魂觉醒 - OpenClaw Skill
+胡桃·幽冥引渡者 - OpenClaw Skill v1.1
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Kitaro-Loked"
 
-from .hutao_skill import HuTaoSoulAwakening
+from .hutao_skill import HuTaoNetherworldGuide
 
-__all__ = ["HuTaoSoulAwakening", "__version__"]
+__all__ = ["HuTaoNetherworldGuide", "__version__"]

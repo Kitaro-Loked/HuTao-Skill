@@ -1,5 +1,5 @@
-"""Hu Tao Soul Awakening Skill for OpenClaw"""
+"""Hu Tao Netherworld Guide Skill for OpenClaw"""
 
-from hutao_skill import HuTaoSoulAwakening
+from hutao_skill import HuTaoNetherworldGuide
 
-__all__ = ["HuTaoSoulAwakening"]
+__all__ = ["HuTaoNetherworldGuide"]

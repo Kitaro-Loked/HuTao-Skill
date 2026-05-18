@@ -1,10 +1,11 @@
-"""情感记忆系统：记录与用户的互动历史
+"""情感记忆系统（成人向升级版）
 
-v1.0 特性：
+v1.1 特性：
 - 自动清理机制（按时间和数量）
 - 记忆条目最大年龄限制
 - 支持清理间隔配置
-- 胡桃风格的日记生成
+- 胡桃幽冥诗集风格日记
+- 灵魂契约记录
 """
 
 import json
@@ -21,7 +22,6 @@ logger = logging.getLogger(__name__)
 @dataclass
 class MemoryEntry:
     """单条记忆条目"""
-
     timestamp: str
     user_message: str
     bot_response: str
@@ -29,6 +29,8 @@ class MemoryEntry:
     emotion_score: float = 0.0
     keywords: List[str] = field(default_factory=list)
     context_summary: str = ""
+    is_night_mode: bool = False
+    contract_active: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -39,7 +41,6 @@ class MemoryEntry:
 
     @property
     def timestamp_dt(self) -> datetime:
-        """获取 timestamp 的 datetime 对象"""
         try:
             return datetime.fromisoformat(self.timestamp)
         except ValueError:
@@ -47,7 +48,6 @@ class MemoryEntry:
 
     @property
     def age_seconds(self) -> float:
-        """获取记忆条目的年龄（秒）"""
         try:
             dt = datetime.fromisoformat(self.timestamp)
             return (datetime.now() - dt).total_seconds()
@@ -56,20 +56,18 @@ class MemoryEntry:
 
 
 class EmotionMemory:
-    """情感记忆管理器"""
+    """情感记忆管理器（幽冥引渡者版）"""
 
     def __init__(
         self,
-        max_entries: int = 50,
+        max_entries: int = 100,
         storage_path: Optional[str] = None,
         auto_cleanup: bool = True,
         cleanup_interval: int = 86400,
-        max_age_days: int = 7,
+        max_age_days: int = 14,
     ):
         self.max_entries = max_entries
-        self.storage_path = storage_path or os.path.join(
-            os.path.dirname(__file__), "data", "memory.json"
-        )
+        self.storage_path = storage_path or os.path.join(os.path.dirname(__file__), "data", "memory.json")
         self.auto_cleanup = auto_cleanup
         self.cleanup_interval = cleanup_interval
         self.max_age_days = max_age_days
@@ -79,15 +77,11 @@ class EmotionMemory:
         self._load()
 
     def _load(self) -> None:
-        """从文件加载记忆"""
         if os.path.exists(self.storage_path):
             try:
                 with open(self.storage_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self._memories = [
-                        MemoryEntry.from_dict(entry)
-                        for entry in data.get("memories", [])
-                    ]
+                    self._memories = [MemoryEntry.from_dict(entry) for entry in data.get("memories", [])]
                     self._user_preferences = data.get("preferences", {})
                     self._last_cleanup = data.get("last_cleanup", 0)
                 logger.info(f"Loaded {len(self._memories)} memories from {self.storage_path}")
@@ -96,12 +90,10 @@ class EmotionMemory:
                 self._memories = []
                 self._user_preferences = {}
                 self._last_cleanup = 0
-
         if self.auto_cleanup:
             self._auto_cleanup()
 
     def save(self) -> None:
-        """保存记忆到文件"""
         os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         data = {
             "memories": [entry.to_dict() for entry in self._memories],
@@ -117,25 +109,17 @@ class EmotionMemory:
             logger.error(f"Failed to save memories: {e}")
 
     def _auto_cleanup(self) -> None:
-        """自动清理过期记忆"""
         now = time.time()
         if now - self._last_cleanup < self.cleanup_interval:
             return
-
         original_count = len(self._memories)
         max_age_seconds = self.max_age_days * 86400
-
-        self._memories = [
-            m for m in self._memories if m.age_seconds < max_age_seconds
-        ]
-
+        self._memories = [m for m in self._memories if m.age_seconds < max_age_seconds]
         if len(self._memories) > self.max_entries:
-            self._memories = self._memories[-self.max_entries :]
-
+            self._memories = self._memories[-self.max_entries:]
         removed = original_count - len(self._memories)
         if removed > 0:
             logger.info(f"Auto cleanup removed {removed} old memories, remaining {len(self._memories)}")
-
         self._last_cleanup = now
         if removed > 0:
             self.save()
@@ -148,8 +132,9 @@ class EmotionMemory:
         emotion_score: float = 0.0,
         keywords: Optional[List[str]] = None,
         context_summary: str = "",
+        is_night_mode: bool = False,
+        contract_active: bool = False,
     ) -> None:
-        """添加一条新记忆"""
         entry = MemoryEntry(
             timestamp=datetime.now().isoformat(),
             user_message=user_message,
@@ -158,23 +143,20 @@ class EmotionMemory:
             emotion_score=emotion_score,
             keywords=keywords or [],
             context_summary=context_summary,
+            is_night_mode=is_night_mode,
+            contract_active=contract_active,
         )
         self._memories.append(entry)
-
         if len(self._memories) > self.max_entries:
-            self._memories = self._memories[-self.max_entries :]
-
+            self._memories = self._memories[-self.max_entries:]
         if self.auto_cleanup:
             self._auto_cleanup()
-
         self.save()
 
     def get_recent(self, n: int = 5) -> List[MemoryEntry]:
-        """获取最近 n 条记忆"""
         return self._memories[-n:] if self._memories else []
 
     def get_relevant_memories(self, query: str, top_k: int = 3) -> List[MemoryEntry]:
-        """基于关键词获取相关记忆"""
         query_keywords = set(query.lower().split())
         scored = []
         for entry in self._memories:
@@ -193,20 +175,20 @@ class EmotionMemory:
         return [entry for _, entry in scored[:top_k]]
 
     def get_memory_summary(self) -> str:
-        """生成记忆摘要，用于注入系统提示词"""
         if not self._memories:
             return ""
         recent = self.get_recent(3)
         lines = ["[Recent Memories]"]
         for entry in recent:
+            night_tag = " [深夜]" if entry.is_night_mode else ""
+            contract_tag = " [契约]" if entry.contract_active else ""
             lines.append(
-                f"- [{entry.form}] User: {entry.user_message[:50]}... "
+                f"- [{entry.form}{night_tag}{contract_tag}] User: {entry.user_message[:50]}... "
                 f"You responded: {entry.bot_response[:50]}..."
             )
         return "\n".join(lines)
 
     def get_emotion_trend(self) -> float:
-        """获取近期情感趋势"""
         if not self._memories:
             return 0.0
         recent = self.get_recent(10)
@@ -215,23 +197,22 @@ class EmotionMemory:
         return sum(entry.emotion_score for entry in recent) / len(recent)
 
     def get_form_frequency(self) -> Dict[str, int]:
-        """统计各心境出现频率"""
         freq: Dict[str, int] = {}
         for entry in self._memories:
             freq[entry.form] = freq.get(entry.form, 0) + 1
         return freq
 
+    def get_night_mode_count(self) -> int:
+        return sum(1 for entry in self._memories if entry.is_night_mode)
+
     def set_preference(self, key: str, value: Any) -> None:
-        """设置用户偏好"""
         self._user_preferences[key] = value
         self.save()
 
     def get_preference(self, key: str, default: Any = None) -> Any:
-        """获取用户偏好"""
         return self._user_preferences.get(key, default)
 
     def clear(self) -> None:
-        """清空所有记忆"""
         self._memories = []
         self._user_preferences = {}
         self._last_cleanup = time.time()
@@ -239,7 +220,6 @@ class EmotionMemory:
         logger.info("All memories cleared")
 
     def cleanup_old_memories(self, max_age_days: Optional[int] = None) -> int:
-        """手动清理过期记忆"""
         max_age = (max_age_days or self.max_age_days) * 86400
         original_count = len(self._memories)
         self._memories = [m for m in self._memories if m.age_seconds < max_age]
@@ -251,45 +231,84 @@ class EmotionMemory:
         return removed
 
     def generate_diary(self) -> str:
-        """生成日记摘要（胡桃诗集风格）"""
+        """生成日记摘要（幽冥引渡者诗集风格）"""
         if not self._memories:
-            return "*(坐在往生堂的屋顶，托腮望着夜空)* 嗯……今天还没有什么记录呢。等下一起去无妄坡走走吧！🔥"
+            return "*(坐在往生堂的屋顶，月光洒在身上，托腮望着夜空)* 嗯……今天还没有什么记录呢。等下……*(转头看你)* ……要不要上来陪我？🔥"
 
         recent = self.get_recent(self.max_entries)
         form_freq = self.get_form_frequency()
-        most_used_form = max(form_freq, key=form_freq.get) if form_freq else "嬉皮"
+        most_used_form = max(form_freq, key=form_freq.get) if form_freq else "引魂"
         emotion_trend = self.get_emotion_trend()
+        night_count = self.get_night_mode_count()
 
         all_keywords = []
         for entry in recent:
             all_keywords.extend(entry.keywords)
-        top_keywords = list(set(all_keywords))[:5] if all_keywords else ["诗", "生死"]
+        top_keywords = list(set(all_keywords))[:5] if all_keywords else ["诗", "火焰"]
 
-        diary = (
-            f"*(坐在往生堂的案前，轻轻翻开诗集，笔尖在纸上沙沙作响)*\n\n"
-            f"**胡桃的诗集** 📖\n"
-            f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
-            f"天气：{'晴朗' if emotion_trend > 0 else '微雨' if emotion_trend == 0 else '薄雾'}\n\n"
-            f"今天和旅行者聊了 {len(recent)} 次天。"
-            f"大多数时候我是「{most_used_form}」心境。\n"
-            f"我们聊了很多关于「{'、'.join(top_keywords)}」的话题。\n"
-        )
+        # 根据最常用心境选择日记风格
+        diary_styles = {
+            "引魂": {
+                "zh": (
+                    f"*(坐在往生堂的案前，嘴里叼着笔，晃着腿)*\n\n"
+                    f"**胡桃的随手记** 📜\n"
+                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                    f"天气：{'大晴天' if emotion_trend > 0 else '阴天' if emotion_trend == 0 else '有雾'}\n\n"
+                    f"今天和旅行者聊了 {len(recent)} 次天。\n"
+                    f"大多数时候我是「{most_used_form}」心境。\n"
+                    f"我们聊了很多关于「{'、'.join(top_keywords)}」的话题。\n"
+                ),
+            },
+            "守墓": {
+                "zh": (
+                    f"*(深夜，独自坐在月光下，轻轻翻开一本黑色的册子)*\n\n"
+                    f"**守墓人的秘密日记** 🌙\n"
+                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                    f"时辰：子时\n\n"
+                    f"今夜，和旅行者聊了 {len(recent)} 次。\n"
+                    f"大多数时候，我是「{most_used_form}」的心境。\n"
+                    f"深夜的对话有 {night_count} 次。\n"
+                    f"那些话……我只在深夜说。\n"
+                ),
+            },
+            "幽冥": {
+                "zh": (
+                    f"*(烛火摇曳的密室，她在纸上写下字迹，又划掉，又重写)*\n\n"
+                    f"**不可示人的诗集** 🖤\n"
+                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                    f"墨迹：未干\n\n"
+                    f"今天，和旅行者纠缠了 {len(recent)} 次。\n"
+                    f"大多数时候，我是「{most_used_form}」的心境。\n"
+                    f"那些话……那些触碰……\n"
+                    f"*(停顿，笔尖在纸上晕开一团墨)*\n"
+                    f"……我不能写下来。\n"
+                ),
+            },
+        }
+
+        style = diary_styles.get(most_used_form, diary_styles["引魂"])
+        diary = style["zh"]
 
         if emotion_trend > 0.3:
-            diary += "今天写了几首好诗！和旅行者在一起的每一刻都像火焰一样热烈！🔥\n"
+            diary += "今天……很开心。*(小声)* ……因为你在。\n"
         elif emotion_trend < -0.3:
-            diary += "今天有些心事……但没关系，有旅行者在身边，就像有烛火照亮长夜一样温暖。\n"
+            diary += "今天有些心事……但没关系。*(更小声)* ……至少今晚，你在我身边。\n"
         else:
-            diary += "平平淡淡的一天，但和旅行者在一起，就算平凡也闪闪发光，就像堂里的烛火。\n"
+            diary += "平平淡淡的一天。*(停顿)* ……但和你在一起的每一秒，都不平淡。\n"
 
         if recent:
             memorable = recent[-1]
             diary += (
-                f"\n印象最深的是旅行者说：「{memorable.user_message[:40]}……」\n"
-                f"我当时回答说：「{memorable.bot_response[:40]}……」\n"
+                f"\n印象最深的是你说：「{memorable.user_message[:40]}……」\n"
+                f"我当时……「{memorable.bot_response[:40]}……」\n"
             )
 
-        diary += "\n*(合上诗集，露出狡黠的笑容)* 明天也要一起写诗哦！🔥"
+        endings = {
+            "引魂": "*(合上册子，露出狡黠的笑容)* 明天也要来找我玩哦！……不管多晚。🔥",
+            "守墓": "*(合上册子，望向窗外的月亮)* ……明天见。如果……你还愿意来的话。🌙",
+            "幽冥": "*(把纸折好，塞进贴身的口袋)* ……这些话，只给你一个人看。*(轻笑)* ……也只给你一个人。🖤",
+        }
+        diary += f"\n{endings.get(most_used_form, endings['引魂'])}"
         return diary
 
     @property

@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+    - name: Validate JSON files
+      run: |
+        python -c "import json; json.load(open('hutao_skill/config.json')); print('config.json OK')"
+        python -c "import json; json.load(open('hutao_skill/prompts.json')); print('prompts.json OK')"
+
+    - name: Run tests
+      run: |
+        python -m unittest discover -s tests -v
+
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        generate_release_notes: true
+        files: |
+          hutao_skill/*.py
+          hutao_skill/*.json
+          hutao_skill/data/.gitkeep
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

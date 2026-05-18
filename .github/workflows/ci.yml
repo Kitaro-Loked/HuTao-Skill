@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
 
     steps:
     - uses: actions/checkout@v4
@@ -32,12 +32,23 @@ jobs:
         # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings
-        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        flake8 . --count --exit-zero --max-complexity=15 --max-line-length=150 --statistics
 
     - name: Validate JSON files
       run: |
         python -c "import json; json.load(open('hutao_skill/config.json')); print('config.json OK')"
         python -c "import json; json.load(open('hutao_skill/prompts.json')); print('prompts.json OK')"
+
+    - name: Test module imports
+      run: |
+        python -c "from hutao_skill.hutao_skill import HuTaoNetherworldGuide; print('hutao_skill OK')"
+        python -c "from hutao_skill.emotion_manager import EmotionManager; print('emotion_manager OK')"
+        python -c "from hutao_skill.memory import EmotionMemory; print('memory OK')"
+        python -c "from hutao_skill.events import MinigameManager, SeasonalEventManager; print('events OK')"
+        python -c "from hutao_skill.prompts import get_system_prompt, get_emotion_state_addition; print('prompts OK')"
+        python -c "from hutao_skill.performance import PerformanceTracker; print('performance OK')"
+        python -c "from hutao_skill.affection import AffectionSystem; print('affection OK')"
+        python -c "from hutao_skill.random_events import RandomEventManager; print('random_events OK')"
 
     - name: Run tests
       run: |

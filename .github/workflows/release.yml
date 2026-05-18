@@ -33,13 +33,46 @@ jobs:
       run: |
         python -m unittest discover -s tests -v
 
+    - name: Extract version from tag
+      id: get_version
+      run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
+        name: "HuTao Dual Mode Skill ${{ steps.get_version.outputs.VERSION }}"
+        body: |
+          ## 胡桃·双生引渡者 ${{ steps.get_version.outputs.VERSION }}
+
+          ### 主要特性
+          - **双模式系统**：SFW（全年龄）/ NSFW（成人向）一键切换
+          - **好感度系统**：8个等级，每日签到，连续加成
+          - **随机事件**：惊喜、浪漫、危机、搞笑、专属事件
+          - **深夜模式**：22:00-04:00 自动触发特殊语气
+          - **灵魂契约**：与胡桃缔结专属羁绊
+
+          ### 安装
+          ```bash
+          openclaw skill install https://github.com/Kitaro-Loked/HuTao-Skill
+          ```
+
+          ### 快速开始
+          ```
+          模式 sfw      # 全年龄模式（默认）
+          模式 nsfw     # 成人向模式
+          签到          # 每日签到增加好感度
+          好感度        # 查看好感度状态
+          帮助          # 查看所有指令
+          ```
+
+          ### 文件清单
+          - `hutao_skill/` - Skill 主代码
+          - `tests/` - 30个单元测试
+          - `README.md` - 完整文档
+          - `SKILL.md` - Skill 配置说明
+
+          ### 测试状态
+          ✅ Python 3.10 / 3.11 / 3.12 / 3.13 全部通过
         generate_release_notes: true
-        files: |
-          hutao_skill/*.py
-          hutao_skill/*.json
-          hutao_skill/data/.gitkeep
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

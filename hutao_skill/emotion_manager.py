@@ -1,7 +1,6 @@
-"""心境状态管理器
+"""心境状态管理器 v3.0
 
-胡桃没有多个"形态"，而是根据对话内容自然切换"心境"状态。
-心境状态会影响系统提示词的追加内容，让胡桃的表现更加自然。
+支持 SFW/NSFW 双模式心境状态管理。
 """
 
 import json
@@ -32,22 +31,30 @@ class EmotionState:
 
 
 class EmotionManager:
-    """心境状态管理器"""
+    """心境状态管理器（双模式支持）"""
 
-    def __init__(self, config_path: Optional[str] = None):
-        if config_path is not None:
-            self.config_path = config_path
-        else:
-            self.config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    def __init__(self, config_path: Optional[str] = None, mode: str = "sfw"):
+        self.config_path = config_path or os.path.join(os.path.dirname(__file__), "config.json")
+        self._mode = mode
         self._states: Dict[str, EmotionState] = {}
         self._load_config()
 
+    @property
+    def mode(self) -> str:
+        return self._mode
+
+    @mode.setter
+    def mode(self, value: str) -> None:
+        if value != self._mode:
+            self._mode = value
+            self._states.clear()
+            self._load_config()
+            logger.info(f"EmotionManager mode switched to: {value}")
+
     def _load_config(self) -> None:
-        """从配置文件加载心境状态配置"""
         if not os.path.exists(self.config_path):
             logger.error(f"Config file not found: {self.config_path}")
             raise FileNotFoundError(f"Config file not found: {self.config_path}")
-
         try:
             with open(self.config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -55,7 +62,8 @@ class EmotionManager:
             logger.error(f"Invalid JSON in config file: {e}")
             raise
 
-        states_config = config.get("emotion_states", {})
+        states_key = f"{self._mode}_emotion_states"
+        states_config = config.get(states_key, {})
 
         for state_name, state_data in states_config.items():
             self._states[state_name] = EmotionState(
@@ -66,21 +74,15 @@ class EmotionManager:
                 emotion_tags=state_data.get("emotion_tags", []),
             )
 
-        logger.info(f"Loaded {len(self._states)} emotion states")
+        logger.info(f"Loaded {len(self._states)} emotion states for mode '{self._mode}'")
 
     def get_all_states(self) -> List[str]:
-        """获取所有心境状态名称"""
         return list(self._states.keys())
 
     def get_state(self, name: str) -> Optional[EmotionState]:
-        """获取指定心境状态"""
         return self._states.get(name)
 
     def detect_emotion(self, message: str) -> Optional[str]:
-        """基于消息内容检测心境状态
-        
-        返回得分最高的心境状态，如果没有匹配则返回 None
-        """
         scores: Dict[str, int] = {}
         message_lower = message.lower()
 
@@ -100,7 +102,6 @@ class EmotionManager:
         return best_state
 
     def get_state_stats_display(self, state_name: str, lang: str = "zh") -> str:
-        """获取心境状态展示文本"""
         state = self.get_state(state_name)
         if not state:
             return ""
@@ -116,13 +117,11 @@ class EmotionManager:
         )
 
     def get_random_state(self, exclude: Optional[str] = None) -> str:
-        """随机获取一个心境状态（可排除指定状态）"""
         states = self.get_all_states()
         if exclude and exclude in states:
             states = [s for s in states if s != exclude]
-        return random.choice(states) if states else "嬉皮"
+        return random.choice(states) if states else "引魂"
 
     def reload(self) -> None:
-        """重新加载配置"""
         self._states.clear()
         self._load_config()

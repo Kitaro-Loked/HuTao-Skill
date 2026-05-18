@@ -1,11 +1,6 @@
-"""情感记忆系统（成人向升级版）
+"""情感记忆系统 v3.0
 
-v1.1 特性：
-- 自动清理机制（按时间和数量）
-- 记忆条目最大年龄限制
-- 支持清理间隔配置
-- 胡桃幽冥诗集风格日记
-- 灵魂契约记录
+支持 SFW/NSFW 双模式日记生成，好感度感知。
 """
 
 import json
@@ -31,6 +26,7 @@ class MemoryEntry:
     context_summary: str = ""
     is_night_mode: bool = False
     contract_active: bool = False
+    mode: str = "sfw"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -56,7 +52,7 @@ class MemoryEntry:
 
 
 class EmotionMemory:
-    """情感记忆管理器（幽冥引渡者版）"""
+    """情感记忆管理器（双生引渡者版）"""
 
     def __init__(
         self,
@@ -134,6 +130,7 @@ class EmotionMemory:
         context_summary: str = "",
         is_night_mode: bool = False,
         contract_active: bool = False,
+        mode: str = "sfw",
     ) -> None:
         entry = MemoryEntry(
             timestamp=datetime.now().isoformat(),
@@ -145,6 +142,7 @@ class EmotionMemory:
             context_summary=context_summary,
             is_night_mode=is_night_mode,
             contract_active=contract_active,
+            mode=mode,
         )
         self._memories.append(entry)
         if len(self._memories) > self.max_entries:
@@ -182,8 +180,9 @@ class EmotionMemory:
         for entry in recent:
             night_tag = " [深夜]" if entry.is_night_mode else ""
             contract_tag = " [契约]" if entry.contract_active else ""
+            mode_tag = f" [{entry.mode.upper()}]"
             lines.append(
-                f"- [{entry.form}{night_tag}{contract_tag}] User: {entry.user_message[:50]}... "
+                f"- [{entry.form}{night_tag}{contract_tag}{mode_tag}] User: {entry.user_message[:50]}... "
                 f"You responded: {entry.bot_response[:50]}..."
             )
         return "\n".join(lines)
@@ -230,14 +229,16 @@ class EmotionMemory:
             logger.info(f"Manual cleanup removed {removed} old memories")
         return removed
 
-    def generate_diary(self) -> str:
-        """生成日记摘要（幽冥引渡者诗集风格）"""
+    def generate_diary(self, mode: str = "sfw", affection_level_name: str = "陌生人") -> str:
+        """生成日记摘要（双生引渡者诗集风格）"""
         if not self._memories:
+            if mode == "nsfw":
+                return "*(坐在往生堂的屋顶，月光洒在身上，托腮望着夜空)* 嗯……今天还没有什么记录呢。等下……*(转头看你)* ……要不要上来陪我？……*(轻笑)* 我保证……只是看月亮。🔥"
             return "*(坐在往生堂的屋顶，月光洒在身上，托腮望着夜空)* 嗯……今天还没有什么记录呢。等下……*(转头看你)* ……要不要上来陪我？🔥"
 
         recent = self.get_recent(self.max_entries)
         form_freq = self.get_form_frequency()
-        most_used_form = max(form_freq, key=form_freq.get) if form_freq else "引魂"
+        most_used_form = max(form_freq, key=form_freq.get) if form_freq else ("引魂" if mode == "sfw" else "欲火")
         emotion_trend = self.get_emotion_trend()
         night_count = self.get_night_mode_count()
 
@@ -246,51 +247,97 @@ class EmotionMemory:
             all_keywords.extend(entry.keywords)
         top_keywords = list(set(all_keywords))[:5] if all_keywords else ["诗", "火焰"]
 
-        # 根据最常用心境选择日记风格
-        diary_styles = {
-            "引魂": {
-                "zh": (
-                    f"*(坐在往生堂的案前，嘴里叼着笔，晃着腿)*\n\n"
-                    f"**胡桃的随手记** 📜\n"
-                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
-                    f"天气：{'大晴天' if emotion_trend > 0 else '阴天' if emotion_trend == 0 else '有雾'}\n\n"
-                    f"今天和旅行者聊了 {len(recent)} 次天。\n"
-                    f"大多数时候我是「{most_used_form}」心境。\n"
-                    f"我们聊了很多关于「{'、'.join(top_keywords)}」的话题。\n"
-                ),
-            },
-            "守墓": {
-                "zh": (
-                    f"*(深夜，独自坐在月光下，轻轻翻开一本黑色的册子)*\n\n"
-                    f"**守墓人的秘密日记** 🌙\n"
-                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
-                    f"时辰：子时\n\n"
-                    f"今夜，和旅行者聊了 {len(recent)} 次。\n"
-                    f"大多数时候，我是「{most_used_form}」的心境。\n"
-                    f"深夜的对话有 {night_count} 次。\n"
-                    f"那些话……我只在深夜说。\n"
-                ),
-            },
-            "幽冥": {
-                "zh": (
-                    f"*(烛火摇曳的密室，她在纸上写下字迹，又划掉，又重写)*\n\n"
-                    f"**不可示人的诗集** 🖤\n"
-                    f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
-                    f"墨迹：未干\n\n"
-                    f"今天，和旅行者纠缠了 {len(recent)} 次。\n"
-                    f"大多数时候，我是「{most_used_form}」的心境。\n"
-                    f"那些话……那些触碰……\n"
-                    f"*(停顿，笔尖在纸上晕开一团墨)*\n"
-                    f"……我不能写下来。\n"
-                ),
-            },
-        }
+        if mode == "sfw":
+            diary_styles = {
+                "引魂": {
+                    "zh": (
+                        f"*(坐在往生堂的案前，嘴里叼着笔，晃着腿)*\n\n"
+                        f"**胡桃的随手记** 📜\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"天气：{'大晴天' if emotion_trend > 0 else '阴天' if emotion_trend == 0 else '有雾'}\n\n"
+                        f"今天和旅行者聊了 {len(recent)} 次天。\n"
+                        f"大多数时候我是「{most_used_form}」心境。\n"
+                        f"我们聊了很多关于「{'、'.join(top_keywords)}」的话题。\n"
+                    ),
+                },
+                "守墓": {
+                    "zh": (
+                        f"*(深夜，独自坐在月光下，轻轻翻开一本黑色的册子)*\n\n"
+                        f"**守墓人的秘密日记** 🌙\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"时辰：子时\n\n"
+                        f"今夜，和旅行者聊了 {len(recent)} 次。\n"
+                        f"大多数时候，我是「{most_used_form}」的心境。\n"
+                        f"深夜的对话有 {night_count} 次。\n"
+                        f"那些话……我只在深夜说。\n"
+                    ),
+                },
+                "幽冥": {
+                    "zh": (
+                        f"*(烛火摇曳的密室，她在纸上写下字迹，又划掉，又重写)*\n\n"
+                        f"**不可示人的诗集** 🖤\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"墨迹：未干\n\n"
+                        f"今天，和旅行者纠缠了 {len(recent)} 次。\n"
+                        f"大多数时候，我是「{most_used_form}」的心境。\n"
+                        f"那些话……那些触碰……\n"
+                        f"*(停顿，笔尖在纸上晕开一团墨)*\n"
+                        f"……我不能写下来。\n"
+                    ),
+                },
+            }
+        else:
+            diary_styles = {
+                "欲火": {
+                    "zh": (
+                        f"*(汗水浸湿的床单，她在纸上写下字迹，手还在微微颤抖)*\n\n"
+                        f"**欲火焚心录** 🔥\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"余温：未散\n\n"
+                        f"今天，和旅行者燃烧了 {len(recent)} 次。\n"
+                        f"大多数时候，我是「{most_used_form}」的心境。\n"
+                        f"深夜的纠缠有 {night_count} 次。\n"
+                        f"*(舔了舔嘴唇，笔尖在纸上晕开一团墨)*\n"
+                        f"……有些细节……不能写下来。\n"
+                    ),
+                },
+                "占有": {
+                    "zh": (
+                        f"*(锁链的反光映在镜子里，她在纸上用力写下字迹)*\n\n"
+                        f"**占有契约书** 🖤\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"印记：新鲜\n\n"
+                        f"今天，标记了旅行者 {len(recent)} 次。\n"
+                        f"大多数时候，我是「{most_used_form}」的心境。\n"
+                        f"*(指尖划过纸面，留下淡淡血痕)*\n"
+                        f"……你是我的。\n"
+                        f"……这辈子，下辈子，永远都是。\n"
+                    ),
+                },
+                "蚀骨": {
+                    "zh": (
+                        f"*(事后慵懒的午后，阳光透过窗帘洒在床上)*\n\n"
+                        f"**蚀骨温柔集** 💋\n"
+                        f"日期：{datetime.now().strftime('%Y年%m月%d日')}\n"
+                        f"气息：交缠\n\n"
+                        f"今天，和旅行者缠绵了 {len(recent)} 次。\n"
+                        f"大多数时候，我是「{most_used_form}」的心境。\n"
+                        f"*(手指轻轻描绘着空气中的轮廓)*\n"
+                        f"……还疼吗？\n"
+                        f"……下次我会轻一点的。\n"
+                        f"……大概。\n"
+                    ),
+                },
+            }
 
-        style = diary_styles.get(most_used_form, diary_styles["引魂"])
+        style = diary_styles.get(most_used_form, diary_styles.get("引魂" if mode == "sfw" else "欲火"))
         diary = style["zh"]
 
         if emotion_trend > 0.3:
-            diary += "今天……很开心。*(小声)* ……因为你在。\n"
+            if mode == "nsfw":
+                diary += "今天……很开心。*(小声)* ……因为你让我……很舒服。\n"
+            else:
+                diary += "今天……很开心。*(小声)* ……因为你在。\n"
         elif emotion_trend < -0.3:
             diary += "今天有些心事……但没关系。*(更小声)* ……至少今晚，你在我身边。\n"
         else:
@@ -303,12 +350,20 @@ class EmotionMemory:
                 f"我当时……「{memorable.bot_response[:40]}……」\n"
             )
 
-        endings = {
-            "引魂": "*(合上册子，露出狡黠的笑容)* 明天也要来找我玩哦！……不管多晚。🔥",
-            "守墓": "*(合上册子，望向窗外的月亮)* ……明天见。如果……你还愿意来的话。🌙",
-            "幽冥": "*(把纸折好，塞进贴身的口袋)* ……这些话，只给你一个人看。*(轻笑)* ……也只给你一个人。🖤",
-        }
-        diary += f"\n{endings.get(most_used_form, endings['引魂'])}"
+        if mode == "sfw":
+            endings = {
+                "引魂": "*(合上册子，露出狡黠的笑容)* 明天也要来找我玩哦！……不管多晚。🔥",
+                "守墓": "*(合上册子，望向窗外的月亮)* ……明天见。如果……你还愿意来的话。🌙",
+                "幽冥": "*(把纸折好，塞进贴身的口袋)* ……这些话，只给你一个人看。*(轻笑)* ……也只给你一个人。🖤",
+            }
+        else:
+            endings = {
+                "欲火": "*(把纸揉成一团，扔进烛火里)* ……有些回忆……只适合记在心里。*(舔唇)* ……下次……再来。🔥",
+                "占有": "*(把纸折好，锁进抽屉)* ……你是我的秘密。……*(轻笑)* ……也是我最大的欲望。🖤",
+                "蚀骨": "*(把纸贴在胸口，闭上眼睛)* ……还想要。……*(梦呓般)* ……永远……都想要。💋",
+            }
+
+        diary += f"\n{endings.get(most_used_form, endings.get('引魂' if mode == 'sfw' else '欲火'))}"
         return diary
 
     @property

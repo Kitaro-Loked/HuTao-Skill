@@ -1,0 +1,2 @@
+# Hu Tao Soul Awakening Skill
+# OpenClaw SDK is provided at runtime
